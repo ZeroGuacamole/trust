@@ -1,4 +1,4 @@
-### **Milestone 1: Core Tensor Operations**
+### ~~**Milestone 1: Core Tensor Operations**~~ [COMPLETED]
 
 **Goal**: Establish a core tensor data structure and basic operations.
 
