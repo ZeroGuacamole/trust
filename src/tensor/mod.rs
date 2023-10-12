@@ -1,5 +1,15 @@
 mod ops;
+
 use ops::elementwise::{Add, Div, Mul, Sub};
+use std::ops::Index;
+
+fn compute_strides(shape: &Vec<usize>) -> Vec<usize> {
+    let mut strides = vec![1; shape.len()];
+    for idx in (0..(shape.len() - 1)).rev() {
+        strides[idx] = strides[idx + 1] * shape[idx + 1];
+    }
+    strides
+}
 
 /*
     Notes:
@@ -80,12 +90,23 @@ impl Tensor {
     }
 }
 
-fn compute_strides(shape: &Vec<usize>) -> Vec<usize> {
-    let mut strides = vec![1; shape.len()];
-    for idx in (0..(shape.len() - 1)).rev() {
-        strides[idx] = strides[idx + 1] * shape[idx + 1];
+impl Index<&[usize]> for Tensor {
+    type Output = f32;
+
+    fn index(&self, idx: &[usize]) -> &Self::Output {
+        assert_eq!(
+            idx.len(),
+            self.shape.len(),
+            "Incorrect number of indices provided."
+        );
+
+        let mut flat_idx = 0;
+        for (i, &index) in idx.iter().enumerate() {
+            flat_idx += index * self.strides[i];
+        }
+
+        &self.data[flat_idx]
     }
-    strides
 }
 
 impl Add for Tensor {
@@ -211,6 +232,15 @@ mod tests {
             result.unwrap_err(),
             "Axis for unsqueeze operation is out of bounds.".to_string()
         );
+    }
+
+    // Indexing
+
+    #[test]
+    fn test_tensor_indexing() {
+        let tensor = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+        assert_eq!(tensor[&[0, 1]], 2.0);
+        assert_eq!(tensor[&[1, 0]], 3.0);
     }
 
     // Element-wise operations
