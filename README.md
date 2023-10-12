@@ -5,6 +5,8 @@
 
 A lightweight, efficient, and pure-Rust implementation of n-dimensional tensors, suitable for numerical computations, machine learning, and more.
 
+## Roadmap
+
 ### Milestone 1: Core Tensor Operations ✅
 
 - [x] Tensor data structure with:
