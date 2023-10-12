@@ -1,3 +1,12 @@
+/// Computes the strides for a given tensor shape.
+///
+/// # Arguments
+///
+/// * `shape` - The shape of the tensor.
+///
+/// # Returns
+///
+/// * `Vec<usize>` - The computed strides.
 pub fn compute_strides(shape: &Vec<usize>) -> Vec<usize> {
     let mut strides = vec![1; shape.len()];
     for idx in (0..(shape.len() - 1)).rev() {
@@ -6,6 +15,20 @@ pub fn compute_strides(shape: &Vec<usize>) -> Vec<usize> {
     strides
 }
 
+/// Recursively computes the data for a sliced tensor.
+///
+/// # Arguments
+///
+/// * `tensor_data` - The flat data of the tensor.
+/// * `tensor_shape` - The shape of the tensor.
+/// * `tensor_strides` - The strides of the tensor.
+/// * `starts` - The starting indices for each dimension of the slice.
+/// * `ends` - The ending indices for each dimension of the slice.
+/// * `dims` - The number of dimensions to consider in the slice.
+///
+/// # Returns
+///
+/// * `Vec<f32>` - The data of the sliced tensor.
 pub fn recursive_slice(
     tensor_data: &[f32],
     tensor_shape: &[usize],

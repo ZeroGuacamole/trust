@@ -21,6 +21,12 @@ pub struct Tensor {
 }
 
 impl Tensor {
+    /// Creates a new Tensor with the given data and shape.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - A flat vector containing the tensor's data.
+    /// * `shape` - A vector describing the size of each tensor dimension.
     pub fn new(data: Vec<f32>, shape: Vec<usize>) -> Self {
         let strides = compute_strides(&shape);
         Self {
@@ -30,6 +36,15 @@ impl Tensor {
         }
     }
 
+    /// Ensures that the shapes of two tensors match.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The other tensor to compare with the current one.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<(), String>` - Ok if shapes match, otherwise an error string describing the mismatch.
     fn ensure_same_shape(&self, other: &Self) -> Result<(), String> {
         if self.shape != other.shape {
             Err("Shapes of the tensors do not match.".to_string())
@@ -38,6 +53,15 @@ impl Tensor {
         }
     }
 
+    /// Reshapes the tensor to the specified shape.
+    ///
+    /// # Arguments
+    ///
+    /// * `new_shape` - The desired shape for the reshaped tensor.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Tensor, String>` - The reshaped tensor if the total number of elements remains constant, otherwise an error string.
     pub fn reshape(&self, new_shape: Vec<usize>) -> Result<Self, String> {
         let current_total_size: usize = self.shape.iter().product();
         let new_total_size: usize = new_shape.iter().product();
@@ -57,6 +81,14 @@ impl Tensor {
         })
     }
 
+    /// Removes dimensions of size one from the tensor's shape.
+    ///
+    /// This operation returns a tensor with the same data but with dimensions of size one removed.
+    /// For example, a tensor with shape `[1, 3, 1, 2]` will be squeezed to `[3, 2]`.
+    ///
+    /// # Returns
+    ///
+    /// * `Tensor` - The squeezed tensor.
     pub fn squeeze(&self) -> Self {
         let new_shape: Vec<usize> = self.shape.iter().cloned().filter(|&dim| dim > 1).collect();
         let new_strides = compute_strides(&new_shape);
@@ -67,6 +99,15 @@ impl Tensor {
         }
     }
 
+    /// Adds a dimension of size one at the specified position in the tensor's shape.
+    ///
+    /// # Arguments
+    ///
+    /// * `dim` - The position at which to add the new dimension.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Tensor, String>` - The tensor with the expanded dimension if `dim` is valid, otherwise an error string.
     pub fn unsqueeze(&self, axis: usize) -> Result<Self, String> {
         if axis > self.shape.len() {
             return Err("Axis for unsqueeze operation is out of bounds.".to_string());
@@ -83,6 +124,16 @@ impl Tensor {
         })
     }
 
+    /// Extracts a sub-tensor based on specified start and end points for each dimension.
+    ///
+    /// # Arguments
+    ///
+    /// * `starts` - The starting indices for each dimension.
+    /// * `ends` - The ending indices for each dimension.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Tensor, String>` - The sliced tensor if indices are valid, otherwise an error string.
     pub fn slice(&self, starts: &[usize], ends: &[usize]) -> Result<Self, String> {
         if starts.len() != self.shape.len() {
             return Err(format!(
@@ -160,6 +211,15 @@ impl Index<&[usize]> for Tensor {
 }
 
 impl Add for Tensor {
+    /// Computes the element-wise addition of two tensors.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The other tensor to add.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Box<Tensor>, String>` - The resulting tensor if shapes match, otherwise an error string.
     fn add(&self, other: &Self) -> Result<Box<Self>, String> {
         self.ensure_same_shape(other)?;
 
@@ -175,6 +235,15 @@ impl Add for Tensor {
 }
 
 impl Sub for Tensor {
+    /// Computes the element-wise subtraction of two tensors.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The other tensor to subtract from the current one.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Box<Tensor>, String>` - The resulting tensor if shapes match, otherwise an error string.
     fn sub(&self, other: &Self) -> Result<Box<Self>, String> {
         self.ensure_same_shape(other)?;
 
@@ -190,6 +259,15 @@ impl Sub for Tensor {
 }
 
 impl Mul for Tensor {
+    /// Computes the element-wise multiplication of two tensors.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The other tensor to multiply with the current one.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Box<Tensor>, String>` - The resulting tensor if shapes match, otherwise an error string.
     fn mul(&self, other: &Self) -> Result<Box<Self>, String> {
         self.ensure_same_shape(other)?;
 
@@ -205,6 +283,15 @@ impl Mul for Tensor {
 }
 
 impl Div for Tensor {
+    /// Computes the element-wise division of two tensors.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The tensor to divide the current one by.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Box<Tensor>, String>` - The resulting tensor if shapes match and no division by zero occurs, otherwise an error string.
     fn div(&self, other: &Self) -> Result<Box<Self>, String> {
         self.ensure_same_shape(other)?;
 
