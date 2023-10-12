@@ -11,6 +11,40 @@ fn compute_strides(shape: &Vec<usize>) -> Vec<usize> {
     strides
 }
 
+fn recursive_slice(
+    tensor_data: &[f32],
+    tensor_shape: &[usize],
+    tensor_strides: &[usize],
+    starts: &[usize],
+    ends: &[usize],
+    dims: usize,
+) -> Vec<f32> {
+    if dims == 1 {
+        let mut result = Vec::with_capacity(ends[0] - starts[0]);
+        for i in starts[0]..ends[0] {
+            let flat_idx = i * tensor_strides[0];
+            result.push(tensor_data[flat_idx]);
+        }
+        return result;
+    }
+
+    let mut result = Vec::new();
+    for i in starts[0]..ends[0] {
+        let sub_tensor_start = i * tensor_strides[0];
+        let sub_tensor_end = sub_tensor_start + tensor_shape[1..].iter().product::<usize>();
+        let sub_tensor_data = &tensor_data[sub_tensor_start..sub_tensor_end];
+        result.extend(recursive_slice(
+            sub_tensor_data,
+            &tensor_shape[1..],
+            &tensor_strides[1..],
+            &starts[1..],
+            &ends[1..],
+            dims - 1,
+        ))
+    }
+    result
+}
+
 /*
     Notes:
     - Storing the data as 1D for memory management simplification
@@ -84,6 +118,62 @@ impl Tensor {
 
         Ok(Self {
             data: self.data.clone(),
+            shape: new_shape,
+            strides: new_strides,
+        })
+    }
+
+    pub fn slice(&self, starts: &[usize], ends: &[usize]) -> Result<Self, String> {
+        if starts.len() != self.shape.len() {
+            return Err(format!(
+                "Expected {} start indices, but got {}.",
+                self.shape.len(),
+                starts.len()
+            ));
+        }
+        if ends.len() != self.shape.len() {
+            return Err(format!(
+                "Expected {} end indices, but got {}.",
+                self.shape.len(),
+                ends.len()
+            ));
+        }
+
+        for ((&start, &end), &dim) in starts.iter().zip(ends.iter()).zip(self.shape.iter()) {
+            if start > end {
+                return Err(format!(
+                    "Start index ({}) cannot be greater than end index ({}).",
+                    start, end
+                ));
+            }
+            if start >= dim || end > dim {
+                return Err(format!(
+                    "Indices out of bounds for dimension of size {}. Got start: {}, end: {}.",
+                    dim, start, end
+                ));
+            }
+        }
+
+        let new_shape: Vec<usize> = starts
+            .iter()
+            .zip(ends.iter())
+            .map(|(&start, &end)| end - start)
+            .collect();
+
+        // We might need to change to a more efficient algorithms or strategies,
+        // for cases like, very high-dimensional tensors or large slices
+        let new_data = recursive_slice(
+            &self.data,
+            &self.shape,
+            &self.strides,
+            starts,
+            ends,
+            self.shape.len(),
+        );
+        let new_strides = compute_strides(&new_shape);
+
+        Ok(Self {
+            data: new_data,
             shape: new_shape,
             strides: new_strides,
         })
@@ -241,6 +331,79 @@ mod tests {
         let tensor = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
         assert_eq!(tensor[&[0, 1]], 2.0);
         assert_eq!(tensor[&[1, 0]], 3.0);
+    }
+
+    #[test]
+    fn test_tensor_indexing_few_indices() {
+        let tensor = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+        let result = std::panic::catch_unwind(|| tensor[&[1]]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_tensor_indexing_many_indices() {
+        let tensor = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+        let result = std::panic::catch_unwind(|| tensor[&[1, 1, 1]]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_tensor_indexing_out_of_bounds() {
+        let tensor = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+        let result = std::panic::catch_unwind(|| tensor[&[2, 1]]);
+        assert!(result.is_err());
+    }
+
+    // Slicing
+
+    #[test]
+    fn test_tensor_slicing() {
+        let tensor = Tensor::new(
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+            vec![3, 3],
+        );
+        let result = tensor.slice(&[0, 1], &[2, 3]).unwrap();
+
+        assert_eq!(result.data, vec![2.0, 3.0, 5.0, 6.0]);
+        assert_eq!(result.shape, vec![2, 2]);
+    }
+
+    #[test]
+    fn test_tensor_slicing_few_indices() {
+        let tensor: Tensor = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+        let result = tensor.slice(&[1], &[2, 2]);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Expected 2 start indices, but got 1.");
+    }
+
+    #[test]
+    fn test_tensor_slicing_many_indices() {
+        let tensor: Tensor = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+        let result = tensor.slice(&[1, 1], &[2, 2, 2]);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Expected 2 end indices, but got 3.");
+    }
+
+    #[test]
+    fn test_tensor_slicing_start_greater_than_end() {
+        let tensor = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+        let result = tensor.slice(&[1, 2], &[1, 1]);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Start index (2) cannot be greater than end index (1)."
+        );
+    }
+
+    #[test]
+    fn test_tensor_slicing_out_of_bounds() {
+        let tensor = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+        let result = tensor.slice(&[2, 2], &[3, 3]);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Indices out of bounds for dimension of size 2. Got start: 2, end: 3."
+        );
     }
 
     // Element-wise operations
