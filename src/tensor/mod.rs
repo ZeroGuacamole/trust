@@ -1,5 +1,6 @@
 mod ops;
 use ops::elementwise::{Add, Div, Mul, Sub};
+
 /*
     Notes:
     - Storing the data as 1D for memory management simplification
@@ -31,6 +32,51 @@ impl Tensor {
         } else {
             Ok(())
         }
+    }
+
+    pub fn reshape(&self, new_shape: Vec<usize>) -> Result<Self, String> {
+        let current_total_size: usize = self.shape.iter().product();
+        let new_total_size: usize = new_shape.iter().product();
+
+        if new_total_size != current_total_size {
+            return Err(
+                "Total number of elements in the new shape must match the original.".to_string(),
+            );
+        }
+
+        let new_strides = compute_strides(&new_shape);
+
+        Ok(Self {
+            data: self.data.clone(),
+            shape: new_shape,
+            strides: new_strides,
+        })
+    }
+
+    pub fn squeeze(&self) -> Self {
+        let new_shape: Vec<usize> = self.shape.iter().cloned().filter(|&dim| dim > 1).collect();
+        let new_strides = compute_strides(&new_shape);
+        Self {
+            data: self.data.clone(),
+            shape: new_shape,
+            strides: new_strides,
+        }
+    }
+
+    pub fn unsqueeze(&self, axis: usize) -> Result<Self, String> {
+        if axis > self.shape.len() {
+            return Err("Axis for unsqueeze operation is out of bounds.".to_string());
+        }
+
+        let mut new_shape = self.shape.clone();
+        new_shape.insert(axis, 1);
+        let new_strides = compute_strides(&new_shape);
+
+        Ok(Self {
+            data: self.data.clone(),
+            shape: new_shape,
+            strides: new_strides,
+        })
     }
 }
 
@@ -105,6 +151,69 @@ impl Div for Tensor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Tensor manipulation
+
+    #[test]
+    fn test_reshape() {
+        let tensor = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+        let reshaped = tensor.reshape(vec![4, 1]);
+
+        assert!(reshaped.is_ok());
+        assert_eq!(reshaped.unwrap().shape, vec![4, 1]);
+    }
+
+    #[test]
+    fn test_reshape_size_mismatch() {
+        let tensor = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+        let result = tensor.reshape(vec![3]);
+
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Total number of elements in the new shape must match the original.".to_string()
+        );
+    }
+
+    #[test]
+    fn test_squeeze() {
+        let tensor = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![1, 2, 1, 2]);
+        let squeezed = tensor.squeeze();
+
+        assert_eq!(squeezed.shape, vec![2, 2]);
+    }
+
+    #[test]
+    fn test_squeeze_no_dims_of_one() {
+        let tensor = Tensor::new(vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]);
+        let squeezed = tensor.squeeze();
+
+        assert_eq!(squeezed.data, vec![1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(squeezed.shape, vec![2, 2]);
+    }
+
+    #[test]
+    fn test_unsqueeze() {
+        let tensor = Tensor::new(vec![1.0, 2.0], vec![2]);
+        let unsqueezed = tensor.unsqueeze(1);
+
+        assert!(unsqueezed.is_ok());
+        assert_eq!(unsqueezed.unwrap().shape, vec![2, 1]);
+    }
+
+    #[test]
+    fn test_unsqueeze_axis_out_of_bounds() {
+        let tensor = Tensor::new(vec![1.0, 2.0], vec![2]);
+        let result = tensor.unsqueeze(3);
+
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Axis for unsqueeze operation is out of bounds.".to_string()
+        );
+    }
+
+    // Element-wise operations
 
     #[test]
     fn test_tensor_addition() {
