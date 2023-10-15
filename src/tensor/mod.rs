@@ -3,7 +3,9 @@ mod utils;
 
 use ops::elementwise::{Add, Div, Mul, Sub};
 use std::ops::Index;
-use utils::{compute_strides, recursive_slice};
+use utils::{
+    are_broadcast_compatible, broadcast_shape, compute_strides, multi_dim_iter, recursive_slice,
+};
 
 /*
     Notes:
@@ -188,6 +190,39 @@ impl Tensor {
             shape: new_shape,
             strides: new_strides,
         })
+    }
+
+    pub fn add_broadcast(&self, other: &Self) -> Result<Self, String> {
+        if !are_broadcast_compatible(&self.shape, &other.shape) {
+            return Err("Shapes of the tensors are not broadcast compatible.".to_string());
+        }
+
+        let new_shape = broadcast_shape(&self.shape, &other.shape);
+        let new_strides = compute_strides(&new_shape);
+        let mut new_data = Vec::with_capacity(new_shape.iter().product());
+
+        for idx in multi_dim_iter(&new_shape) {
+            let value1 = self.get_broadcast_value(&idx);
+            let value2 = other.get_broadcast_value(&idx);
+            new_data.push(value1 + value2);
+        }
+
+        Ok(Self {
+            data: new_data,
+            shape: new_shape,
+            strides: new_strides,
+        })
+    }
+
+    fn get_broadcast_value(&self, idx: &[usize]) -> f32 {
+        let mut true_idx = Vec::with_capacity(self.shape.len());
+
+        for (i, &dim) in self.shape.iter().enumerate() {
+            let offset = idx.len() - self.shape.len();
+            true_idx.push(if dim == 1 { 0 } else { idx[i + offset] });
+        }
+
+        self[&true_idx]
     }
 }
 

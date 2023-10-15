@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 /// Computes the strides for a given tensor shape.
 ///
 /// # Arguments
@@ -61,4 +63,90 @@ pub fn recursive_slice(
         ))
     }
     result
+}
+
+pub fn are_broadcast_compatible(shape1: &[usize], shape2: &[usize]) -> bool {
+    let s1_len = shape1.len();
+    let s2_len = shape2.len();
+    for i in 0..max(s1_len, s2_len) {
+        let dim1 = if i >= s1_len {
+            &1
+        } else {
+            &shape1[s1_len - 1 - i]
+        };
+        let dim2 = if i >= s2_len {
+            &1
+        } else {
+            &shape2[s2_len - 1 - i]
+        };
+
+        if *dim1 != 1 && *dim2 != 1 && dim1 != dim2 {
+            return false;
+        }
+    }
+
+    true
+}
+
+pub fn broadcast_shape(shape1: &[usize], shape2: &[usize]) -> Vec<usize> {
+    let s1_len = shape1.len();
+    let s2_len = shape2.len();
+    let mut result = Vec::with_capacity(max(s1_len, s2_len));
+    for i in 0..result.capacity() {
+        let dim1 = if i >= s1_len {
+            1
+        } else {
+            shape1[s1_len - 1 - i]
+        };
+        let dim2 = if i >= s2_len {
+            1
+        } else {
+            shape2[s2_len - 1 - i]
+        };
+        result.push(max(dim1, dim2));
+    }
+
+    result.reverse();
+    result
+}
+
+// TODO: Maybe move to iterators module
+
+pub struct MultiDimIter {
+    shape: Vec<usize>,
+    current: Vec<usize>,
+    started: bool,
+}
+
+impl Iterator for MultiDimIter {
+    type Item = Vec<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.started {
+            self.started = true;
+            return Some(self.current.clone());
+        }
+
+        for i in (0..self.shape.len()).rev() {
+            if self.current[i] + 1 < self.shape[i] {
+                self.current[i] += 1;
+
+                for j in i + 1..self.shape.len() {
+                    self.current[j] = 0;
+                }
+
+                return Some(self.current.clone());
+            }
+        }
+
+        None
+    }
+}
+
+pub fn multi_dim_iter(shape: &[usize]) -> MultiDimIter {
+    MultiDimIter {
+        shape: shape.to_vec(),
+        current: vec![0; shape.len()],
+        started: false,
+    }
 }
