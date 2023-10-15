@@ -512,6 +512,89 @@ mod tests {
         );
     }
 
+    // Broadcasting
+
+    #[test]
+    fn test_broadcast_addition() {
+        let tensor1 = Tensor::new(vec![1.0, 2.0, 3.0], vec![3]);
+        let tensor2 = Tensor::new(vec![1.0], vec![1]);
+        let result = tensor1.add_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![2.0, 3.0, 4.0]);
+        assert_eq!(result.shape, vec![3]);
+
+        let tensor1 = Tensor::new(vec![1.0, 2.0, 3.0], vec![3, 1]);
+        let tensor2 = Tensor::new(vec![1.0, 2.0], vec![1, 2]);
+        let result = tensor1.add_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![2.0, 3.0, 3.0, 4.0, 4.0, 5.0]);
+        assert_eq!(result.shape, vec![3, 2]);
+    }
+
+    #[test]
+    fn test_broadcast_subtraction() {
+        let tensor1 = Tensor::new(vec![2.0, 3.0, 4.0], vec![3]);
+        let tensor2 = Tensor::new(vec![1.0], vec![1]);
+        let result = tensor1.sub_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![1.0, 2.0, 3.0]);
+        assert_eq!(result.shape, vec![3]);
+
+        let tensor1 = Tensor::new(vec![2.0, 4.0, 6.0], vec![3, 1]);
+        let tensor2 = Tensor::new(vec![1.0, 2.0], vec![1, 2]);
+        let result = tensor1.sub_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![1.0, 0.0, 3.0, 2.0, 5.0, 4.0]);
+        assert_eq!(result.shape, vec![3, 2]);
+    }
+
+    #[test]
+    fn test_broadcast_multiplication() {
+        let tensor1 = Tensor::new(vec![2.0, 3.0, 4.0], vec![3]);
+        let tensor2 = Tensor::new(vec![2.0], vec![1]);
+        let result = tensor1.mul_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![4.0, 6.0, 8.0]);
+        assert_eq!(result.shape, vec![3]);
+
+        let tensor1 = Tensor::new(vec![2.0, 4.0, 6.0], vec![3, 1]);
+        let tensor2 = Tensor::new(vec![2.0, 3.0], vec![1, 2]);
+        let result = tensor1.mul_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![4.0, 6.0, 8.0, 12.0, 12.0, 18.0]);
+        assert_eq!(result.shape, vec![3, 2]);
+    }
+
+    #[test]
+    fn test_broadcast_division() {
+        let tensor1: Tensor = Tensor::new(vec![4.0, 6.0, 8.0], vec![3]);
+        let tensor2 = Tensor::new(vec![2.0], vec![1]);
+        let result = tensor1.div_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![2.0, 3.0, 4.0]);
+        assert_eq!(result.shape, vec![3]);
+
+        let tensor1 = Tensor::new(vec![4.0, 8.0, 12.0], vec![3, 1]);
+        let tensor2 = Tensor::new(vec![2.0, 4.0], vec![1, 2]);
+        let result = tensor1.div_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![2.0, 1.0, 4.0, 2.0, 6.0, 3.0]);
+        assert_eq!(result.shape, vec![3, 2]);
+    }
+
+    #[test]
+    fn test_broadcast_division_by_zero() {
+        let tensor1 = Tensor::new(vec![4.0, 6.0, 8.0], vec![3]);
+        let tensor2 = Tensor::new(vec![0.0], vec![1]);
+        let result = tensor1.div_broadcast(&tensor2);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Division by zero.");
+    }
+
+    #[test]
+    fn test_broadcast_capability_error() {
+        let tensor1 = Tensor::new(vec![1.0, 2.0], vec![2]);
+        let tensor2 = Tensor::new(vec![1.0, 2.0, 3.0], vec![3]);
+        let result = tensor1.add_broadcast(&tensor2);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Shapes of the tensors are not broadcast compatible."
+        );
+    }
+
     // Element-wise operations
 
     #[test]
