@@ -202,20 +202,20 @@ impl Tensor {
             return Err("Shapes of the tensors are not broadcast compatible.".to_string());
         }
 
-        let new_shape = broadcast_shape(&self.shape, &other.shape);
-        let new_strides = compute_strides(&new_shape);
-        let mut new_data = Vec::with_capacity(new_shape.iter().product());
+        let result_shape = broadcast_shape(&self.shape, &other.shape);
+        let reslt_strides = compute_strides(&result_shape);
+        let mut result_data = Vec::with_capacity(result_shape.iter().product());
 
-        for idx in multi_dim_iter(&new_shape) {
+        for idx in multi_dim_iter(&result_shape) {
             let value1 = self.get_broadcast_value(&idx);
             let value2 = other.get_broadcast_value(&idx);
-            new_data.push(op(value1, value2));
+            result_data.push(op(value1, value2));
         }
 
         Ok(Self {
-            data: new_data,
-            shape: new_shape,
-            strides: new_strides,
+            data: result_data,
+            shape: result_shape,
+            strides: reslt_strides,
         })
     }
 
