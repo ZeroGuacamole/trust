@@ -3,7 +3,9 @@ mod utils;
 
 use ops::elementwise::{Add, Div, Mul, Sub};
 use std::ops::Index;
-use utils::{compute_strides, recursive_slice};
+use utils::{
+    are_broadcast_compatible, broadcast_shape, compute_strides, multi_dim_iter, recursive_slice,
+};
 
 /*
     Notes:
@@ -188,6 +190,63 @@ impl Tensor {
             shape: new_shape,
             strides: new_strides,
         })
+    }
+
+    // Broadcasting
+
+    fn apply_broadcast<F>(&self, other: &Self, op: F) -> Result<Self, String>
+    where
+        F: Fn(f32, f32) -> f32,
+    {
+        if !are_broadcast_compatible(&self.shape, &other.shape) {
+            return Err("Shapes of the tensors are not broadcast compatible.".to_string());
+        }
+
+        let result_shape = broadcast_shape(&self.shape, &other.shape);
+        let reslt_strides = compute_strides(&result_shape);
+        let mut result_data = Vec::with_capacity(result_shape.iter().product());
+
+        for idx in multi_dim_iter(&result_shape) {
+            let value1 = self.get_broadcast_value(&idx);
+            let value2 = other.get_broadcast_value(&idx);
+            result_data.push(op(value1, value2));
+        }
+
+        Ok(Self {
+            data: result_data,
+            shape: result_shape,
+            strides: reslt_strides,
+        })
+    }
+
+    fn get_broadcast_value(&self, idx: &[usize]) -> f32 {
+        let mut true_idx = Vec::with_capacity(self.shape.len());
+
+        for (i, &dim) in self.shape.iter().enumerate() {
+            let offset = idx.len() - self.shape.len();
+            true_idx.push(if dim == 1 { 0 } else { idx[i + offset] });
+        }
+
+        self[&true_idx]
+    }
+
+    pub fn add_broadcast(&self, other: &Self) -> Result<Self, String> {
+        self.apply_broadcast(other, |a, b| a + b)
+    }
+
+    pub fn sub_broadcast(&self, other: &Self) -> Result<Self, String> {
+        self.apply_broadcast(other, |a, b| a - b)
+    }
+
+    pub fn mul_broadcast(&self, other: &Self) -> Result<Self, String> {
+        self.apply_broadcast(other, |a, b| a * b)
+    }
+
+    pub fn div_broadcast(&self, other: &Self) -> Result<Self, String> {
+        if other.data.iter().any(|&value| value == 0.0) {
+            return Err("Division by zero.".to_string());
+        }
+        self.apply_broadcast(other, |a, b| a / b)
     }
 }
 
@@ -450,6 +509,89 @@ mod tests {
         assert_eq!(
             result.unwrap_err(),
             "Indices out of bounds for dimension of size 2. Got start: 2, end: 3."
+        );
+    }
+
+    // Broadcasting
+
+    #[test]
+    fn test_broadcast_addition() {
+        let tensor1 = Tensor::new(vec![1.0, 2.0, 3.0], vec![3]);
+        let tensor2 = Tensor::new(vec![1.0], vec![1]);
+        let result = tensor1.add_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![2.0, 3.0, 4.0]);
+        assert_eq!(result.shape, vec![3]);
+
+        let tensor1 = Tensor::new(vec![1.0, 2.0, 3.0], vec![3, 1]);
+        let tensor2 = Tensor::new(vec![1.0, 2.0], vec![1, 2]);
+        let result = tensor1.add_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![2.0, 3.0, 3.0, 4.0, 4.0, 5.0]);
+        assert_eq!(result.shape, vec![3, 2]);
+    }
+
+    #[test]
+    fn test_broadcast_subtraction() {
+        let tensor1 = Tensor::new(vec![2.0, 3.0, 4.0], vec![3]);
+        let tensor2 = Tensor::new(vec![1.0], vec![1]);
+        let result = tensor1.sub_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![1.0, 2.0, 3.0]);
+        assert_eq!(result.shape, vec![3]);
+
+        let tensor1 = Tensor::new(vec![2.0, 4.0, 6.0], vec![3, 1]);
+        let tensor2 = Tensor::new(vec![1.0, 2.0], vec![1, 2]);
+        let result = tensor1.sub_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![1.0, 0.0, 3.0, 2.0, 5.0, 4.0]);
+        assert_eq!(result.shape, vec![3, 2]);
+    }
+
+    #[test]
+    fn test_broadcast_multiplication() {
+        let tensor1 = Tensor::new(vec![2.0, 3.0, 4.0], vec![3]);
+        let tensor2 = Tensor::new(vec![2.0], vec![1]);
+        let result = tensor1.mul_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![4.0, 6.0, 8.0]);
+        assert_eq!(result.shape, vec![3]);
+
+        let tensor1 = Tensor::new(vec![2.0, 4.0, 6.0], vec![3, 1]);
+        let tensor2 = Tensor::new(vec![2.0, 3.0], vec![1, 2]);
+        let result = tensor1.mul_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![4.0, 6.0, 8.0, 12.0, 12.0, 18.0]);
+        assert_eq!(result.shape, vec![3, 2]);
+    }
+
+    #[test]
+    fn test_broadcast_division() {
+        let tensor1: Tensor = Tensor::new(vec![4.0, 6.0, 8.0], vec![3]);
+        let tensor2 = Tensor::new(vec![2.0], vec![1]);
+        let result = tensor1.div_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![2.0, 3.0, 4.0]);
+        assert_eq!(result.shape, vec![3]);
+
+        let tensor1 = Tensor::new(vec![4.0, 8.0, 12.0], vec![3, 1]);
+        let tensor2 = Tensor::new(vec![2.0, 4.0], vec![1, 2]);
+        let result = tensor1.div_broadcast(&tensor2).unwrap();
+        assert_eq!(result.data, vec![2.0, 1.0, 4.0, 2.0, 6.0, 3.0]);
+        assert_eq!(result.shape, vec![3, 2]);
+    }
+
+    #[test]
+    fn test_broadcast_division_by_zero() {
+        let tensor1 = Tensor::new(vec![4.0, 6.0, 8.0], vec![3]);
+        let tensor2 = Tensor::new(vec![0.0], vec![1]);
+        let result = tensor1.div_broadcast(&tensor2);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Division by zero.");
+    }
+
+    #[test]
+    fn test_broadcast_capability_error() {
+        let tensor1 = Tensor::new(vec![1.0, 2.0], vec![2]);
+        let tensor2 = Tensor::new(vec![1.0, 2.0, 3.0], vec![3]);
+        let result = tensor1.add_broadcast(&tensor2);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Shapes of the tensors are not broadcast compatible."
         );
     }
 

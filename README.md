@@ -26,7 +26,7 @@ A lightweight, efficient, and pure-Rust implementation of n-dimensional tensors,
 
 ### Milestone 2: Advanced Tensor Manipulation
 
-- [ ] Broadcasting support for operations between tensors of different shapes.
+- [x] Broadcasting support for operations between tensors of different shapes.
 - [ ] Reduction operations:
   - [ ] Sum
   - [ ] Mean
