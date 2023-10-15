@@ -192,7 +192,12 @@ impl Tensor {
         })
     }
 
-    pub fn add_broadcast(&self, other: &Self) -> Result<Self, String> {
+    // Broadcasting
+
+    fn apply_broadcast<F>(&self, other: &Self, op: F) -> Result<Self, String>
+    where
+        F: Fn(f32, f32) -> f32,
+    {
         if !are_broadcast_compatible(&self.shape, &other.shape) {
             return Err("Shapes of the tensors are not broadcast compatible.".to_string());
         }
@@ -204,7 +209,7 @@ impl Tensor {
         for idx in multi_dim_iter(&new_shape) {
             let value1 = self.get_broadcast_value(&idx);
             let value2 = other.get_broadcast_value(&idx);
-            new_data.push(value1 + value2);
+            new_data.push(op(value1, value2));
         }
 
         Ok(Self {
@@ -223,6 +228,25 @@ impl Tensor {
         }
 
         self[&true_idx]
+    }
+
+    pub fn add_broadcast(&self, other: &Self) -> Result<Self, String> {
+        self.apply_broadcast(other, |a, b| a + b)
+    }
+
+    pub fn sub_broadcast(&self, other: &Self) -> Result<Self, String> {
+        self.apply_broadcast(other, |a, b| a - b)
+    }
+
+    pub fn mul_broadcast(&self, other: &Self) -> Result<Self, String> {
+        self.apply_broadcast(other, |a, b| a * b)
+    }
+
+    pub fn div_broadcast(&self, other: &Self) -> Result<Self, String> {
+        if other.data.iter().any(|&value| value == 0.0) {
+            return Err("Division by zero.".to_string());
+        }
+        self.apply_broadcast(other, |a, b| a / b)
     }
 }
 
