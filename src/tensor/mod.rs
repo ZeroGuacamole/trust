@@ -2,6 +2,7 @@ pub mod ops;
 mod utils;
 
 use ops::elementwise::{Add, Div, Mul, Sub};
+use ops::reductions::Sum;
 use std::ops::Index;
 use utils::{
     are_broadcast_compatible, broadcast_shape, compute_strides, multi_dim_iter, recursive_slice,
@@ -363,4 +364,56 @@ impl Div for Tensor {
 
         Ok(Box::new(Self::new(new_data, self.shape.clone())))
     }
+}
+
+impl Sum for Tensor {
+    fn sum(&self, dim: Option<usize>) -> Self {
+        if dim.is_none() {
+            let total_sum = self.data.iter().sum();
+            return Self::new(vec![total_sum], vec![1]);
+        }
+
+        let dim = dim.unwrap();
+        let mut result_shape = self.shape.clone();
+        result_shape[dim] = 1;
+
+        let mut result_data = vec![0.0; result_shape.iter().product()];
+        let result_strides = compute_strides(&result_shape);
+
+        // TODO: Might need to revisit as it will introduced overhead
+        // overhead because we're repeatedly converting between
+        // flat and multi-dimensional indices
+        for i in 0..self.shape[dim] {
+            for (j, result_val) in result_data.iter_mut().enumerate() {
+                let mut idx = flat_to_multi_index(&self.shape, &self.strides, j);
+                idx[dim] = i;
+
+                let flat_index = compute_flat_index(&self.shape, &self.strides, &idx);
+                *result_val += self.data[flat_index];
+            }
+        }
+
+        Self {
+            data: result_data,
+            shape: result_shape,
+            strides: result_strides,
+        }
+    }
+}
+
+fn compute_flat_index(shape: &[usize], strides: &[usize], idx: &[usize]) -> usize {
+    assert_eq!(shape.len(), idx.len());
+    idx.iter().zip(strides).fold(0, |acc, (&i, &s)| acc + i * s)
+}
+
+fn flat_to_multi_index(shape: &[usize], strides: &[usize], flat_index: usize) -> Vec<usize> {
+    let mut idx = vec![0; shape.len()];
+    let mut remainder = flat_index;
+
+    for i in (0..shape.len()).rev() {
+        idx[i] = remainder / strides[i];
+        remainder %= strides[i];
+    }
+
+    idx
 }
