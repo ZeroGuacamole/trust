@@ -2,9 +2,9 @@ name: Integration
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -14,16 +14,16 @@ jobs:
     name: Rust build and checks
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Format
-      run: cargo fmt -- --check
+      - name: Format
+        run: cargo fmt -- --check
 
-    - name: Linter
-      run: cargo clippy -- -D warnings
+      - name: Linter
+        run: cargo clippy -- -D warnings
 
-    - name: Build
-      run: cargo build --verbose
+      - name: Build
+        run: cargo build --verbose
 
-    - name: Test
-      run: cargo test --verbose
+      - name: Test
+        run: cargo test --verbose

@@ -2,7 +2,7 @@ name: Generate documentation
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -12,13 +12,13 @@ jobs:
     name: Generate documentation and deploy
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Generate documentation
-      run: cargo doc --no-deps
+      - name: Generate documentation
+        run: cargo doc --no-deps
 
-    - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: target/doc
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: target/doc/trust
