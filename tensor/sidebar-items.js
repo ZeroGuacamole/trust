@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["Tensor"]};
+window.SIDEBAR_ITEMS = {"mod":["ops"],"struct":["Tensor"]};
